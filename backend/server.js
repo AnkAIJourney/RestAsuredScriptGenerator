@@ -6,7 +6,6 @@ const fs = require('fs-extra');
 const axios = require('axios');
 const XLSX = require('xlsx');
 const mongoose = require('mongoose');
-const path = require ('path');
 require ('dotenv').config ({path: '../.env'});
 require('dotenv').config();
 
