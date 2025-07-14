@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="30" fill="#667eea" stroke="#ffffff" stroke-width="2"/>
+  
+  <!-- Code brackets representing script generation -->
+  <path d="M18 22 L12 32 L18 42" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M46 22 L52 32 L46 42" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Gear icon representing automation -->
+  <circle cx="32" cy="32" r="8" fill="none" stroke="#ffffff" stroke-width="2"/>
+  <circle cx="32" cy="32" r="3" fill="#ffffff"/>
+  
+  <!-- Small dots representing AI/processing -->
+  <circle cx="26" cy="26" r="1.5" fill="#ffffff" opacity="0.8"/>
+  <circle cx="38" cy="26" r="1.5" fill="#ffffff" opacity="0.8"/>
+  <circle cx="26" cy="38" r="1.5" fill="#ffffff" opacity="0.8"/>
+  <circle cx="38" cy="38" r="1.5" fill="#ffffff" opacity="0.8"/>
+</svg>
