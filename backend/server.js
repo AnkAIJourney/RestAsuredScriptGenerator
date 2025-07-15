@@ -1,20 +1,17 @@
-import express from 'express';
-import cors from 'cors';
-import multer from 'multer';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs-extra';
-import axios from 'axios';
-import XLSX from 'xlsx';
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
-
-// Load environment variables
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+const express = require('express');
+const cors = require('cors');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs-extra');
+const axios = require('axios');
+const XLSX = require('xlsx');
+const mongoose = require('mongoose');
+require ('dotenv').config ({path: '../.env'});
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 
 // Database connection
 const connectDB = async () => {
@@ -26,7 +23,7 @@ const connectDB = async () => {
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
     console.error('❌ MongoDB connection error:', error);
-    setTimeout(() => process.exit(1), 1000); // Delay exit for logs to flush
+    process.exit(1);
   }
 };
 
@@ -35,25 +32,24 @@ connectDB();
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'https://restasuredscriptgenerator.onrender.com' || 'http://localhost:3000',
+  origin: "https://restasuredscriptgenerator.onrender.com" || 'http://localhost:3000',
   credentials: true
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Authentication routes
-import authRoutes from './routes/auth.js';
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', require('./routes/auth'));
 
 // Import authentication middleware
-import { auth, optionalAuth } from './middleware/auth.js';
+const { auth, optionalAuth } = require('./middleware/auth');
 app.use(express.static(path.join(__dirname, '../frontend/build')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend', 'build', 'index.html'));
 });
 
 // Create uploads and output directories
-const uploadsDir = path.join(__dirname, 'Uploads');
+const uploadsDir = path.join(__dirname, 'uploads');
 const outputDir = path.join(__dirname, 'output');
 fs.ensureDirSync(uploadsDir);
 fs.ensureDirSync(outputDir);
@@ -69,20 +65,19 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({
+const upload = multer({ 
   storage: storage,
   fileFilter: (req, file, cb) => {
     const allowedTypes = /\.(xlsx|xls|java)$/i;
     if (allowedTypes.test(file.originalname)) {
       cb(null, true);
     } else {
-      console.error(`Invalid file type: ${file.originalname}`);
       cb(new Error('Invalid file type. Only Excel and Java files are allowed.'));
     }
   }
 });
 
-// Enhanced logging utility
+// Enhanced logging utility (inspired by Streamlit version)
 const logger = {
   info: (message, data = null) => {
     const timestamp = new Date().toISOString();
@@ -97,7 +92,7 @@ const logger = {
       if (error.stack) console.error('Stack:', error.stack);
     }
   },
-  warn: (messagedias, data = null) => {
+  warn: (message, data = null) => {
     const timestamp = new Date().toISOString();
     console.warn(`[${timestamp}] WARN: ${message}`);
     if (data) console.warn('Data:', JSON.stringify(data, null, 2));
@@ -112,14 +107,14 @@ const validateEnvironmentConfig = () => {
     'OPENAI_API_VERSION',
     'OPENAI_API_KEY'
   ];
-
+  
   const missingVars = requiredVars.filter(varName => !process.env[varName]);
-
+  
   if (missingVars.length > 0) {
     logger.error(`Missing required environment variables: ${missingVars.join(', ')}`);
     return { valid: false, missingVars };
   }
-
+  
   logger.info('Environment configuration validation passed');
   return { valid: true, missingVars: [] };
 };
@@ -127,19 +122,26 @@ const validateEnvironmentConfig = () => {
 // Utility functions
 const testTestrailConnection = async (username, apikey, testCaseId, testrailBaseUrl) => {
   try {
+    // Validate and normalize the URL
     if (!testrailBaseUrl) {
       throw new Error('TestRail base URL is required');
     }
-
+    
+    // Ensure the URL doesn't end with a slash
     const normalizedUrl = testrailBaseUrl.replace(/\/+$/, '');
-
+    
+    // Validate URL format
     try {
       new URL(normalizedUrl);
     } catch (urlError) {
       throw new Error(`Invalid TestRail URL format: ${normalizedUrl}`);
     }
 
-    logger.info('Testing TestRail connection:', { url: normalizedUrl, username, testCaseId });
+    console.log('Testing TestRail connection:', {
+      url: normalizedUrl,
+      username,
+      testCaseId
+    });
 
     const response = await axios.get(
       `${normalizedUrl}/index.php?/api/v2/get_case/${testCaseId}`,
@@ -151,7 +153,7 @@ const testTestrailConnection = async (username, apikey, testCaseId, testrailBase
     );
     return { success: true, message: 'TestRail connection successful' };
   } catch (error) {
-    logger.error('TestRail connection error:', error);
+    console.error('TestRail connection error:', error);
     if (error.response) {
       const status = error.response.status;
       if (status === 401) {
@@ -168,19 +170,26 @@ const testTestrailConnection = async (username, apikey, testCaseId, testrailBase
 
 const fetchTestrailCases = async (testCaseId, username, apikey, testrailBaseUrl) => {
   try {
+    // Validate and normalize the URL
     if (!testrailBaseUrl) {
       throw new Error('TestRail base URL is required');
     }
-
+    
+    // Ensure the URL doesn't end with a slash
     const normalizedUrl = testrailBaseUrl.replace(/\/+$/, '');
-
+    
+    // Validate URL format
     try {
       new URL(normalizedUrl);
     } catch (urlError) {
       throw new Error(`Invalid TestRail URL format: ${normalizedUrl}`);
     }
 
-    logger.info('Fetching TestRail case:', { url: normalizedUrl, username, testCaseId });
+    console.log('Fetching TestRail case:', {
+      url: normalizedUrl,
+      username,
+      testCaseId
+    });
 
     const response = await axios.get(
       `${normalizedUrl}/index.php?/api/v2/get_case/${testCaseId}`,
@@ -255,21 +264,21 @@ const parseTestrailData = (customPreconds, customStepsSeparated, apiDetails) => 
 const parseExcel = (filePath) => {
   try {
     const workbook = XLSX.readFile(filePath);
-
+    
     if (!workbook.SheetNames.includes('API_detail') || !workbook.SheetNames.includes('Test_scenarios')) {
-      throw new Error("Excel file missing required sheets: ' inDetail' and 'Test_scenarios'");
+      throw new Error("Excel file missing required sheets: 'API_detail' and 'Test_scenarios'");
     }
 
     const apiSheet = workbook.Sheets['API_detail'];
     const apiData = XLSX.utils.sheet_to_json(apiSheet, { header: 1 });
-
-    logger.info('DEBUG: Raw Excel data from API_detail sheet:');
+    
+    console.log('DEBUG: Raw Excel data from API_detail sheet:');
     apiData.forEach((row, index) => {
-      if (index < 20) {
-        logger.info(`Row ${index}:`, row);
+      if (index < 20) { // Log first 20 rows for debugging
+        console.log(`Row ${index}:`, row);
       }
     });
-
+    
     const apiDetails = {
       'Request Type': 'GET',
       'Request Url': 'https://api.example.com',
@@ -277,40 +286,50 @@ const parseExcel = (filePath) => {
       'Body': null
     };
 
+    // More flexible parsing logic
     for (let i = 0; i < apiData.length; i++) {
       const row = apiData[i];
       if (!row || row.length === 0) continue;
-
+      
       const label = row[0] ? row[0].toString().toLowerCase().trim() : '';
       const value = row[1];
-
-      logger.info(`Processing row ${i}: label="${label}", value="${value}"`);
-
+      
+      console.log(`Processing row ${i}: label="${label}", value="${value}"`);
+      
+      // Parse different fields based on row labels
       if (label.includes('request type') || label.includes('method') || label.includes('http method')) {
         apiDetails['Request Type'] = value || 'GET';
-        logger.info('Set Request Type:', apiDetails['Request Type']);
-      } else if (label.includes('request url') || label.includes('url') || label.includes('endpoint')) {
+        console.log('Set Request Type:', apiDetails['Request Type']);
+      }
+      else if (label.includes('request url') || label.includes('url') || label.includes('endpoint')) {
         apiDetails['Request Url'] = value || 'https://api.example.com';
-        logger.info('Set Request Url:', apiDetails['Request Url']);
-      } else if (label.includes('header') && value) {
+        console.log('Set Request Url:', apiDetails['Request Url']);
+      }
+      else if (label.includes('header') && value) {
+        // Header row format: "Header" | "HeaderName" | "HeaderValue"
         const headerName = value;
         const headerValue = row[2];
         if (headerName && headerValue) {
           apiDetails.Headers[headerName] = headerValue;
-          logger.info(`Added header: ${headerName} = ${headerValue}`);
+          console.log(`Added header: ${headerName} = ${headerValue}`);
         }
-      } else if (label.includes('body') || label.includes('request body') || label.includes('payload')) {
+      }
+      else if (label.includes('body') || label.includes('request body') || label.includes('payload')) {
         apiDetails.Body = value || null;
-        logger.info('Set Body:', apiDetails.Body);
-      } else if (label.includes('json') || label.includes('data')) {
+        console.log('Set Body:', apiDetails.Body);
+      }
+      // Also try to parse JSON body from multiple formats
+      else if (label.includes('json') || label.includes('data')) {
         if (value && !apiDetails.Body) {
           apiDetails.Body = value;
-          logger.info('Set Body from JSON/data field:', apiDetails.Body);
+          console.log('Set Body from JSON/data field:', apiDetails.Body);
         }
       }
     }
-
+    
+    // Fallback parsing for older Excel format
     if (!apiDetails.Body && apiData.length >= 3) {
+      // Try the old parsing logic as fallback
       let headerRow = 2;
       while (headerRow < apiData.length && apiData[headerRow] && apiData[headerRow][1]) {
         const headerName = apiData[headerRow][1];
@@ -320,23 +339,25 @@ const parseExcel = (filePath) => {
         }
         headerRow++;
       }
-
+      
+      // Try to find body after headers
       if (headerRow < apiData.length && apiData[headerRow] && apiData[headerRow][1]) {
         apiDetails.Body = apiData[headerRow][1];
-        logger.info('Set Body from fallback logic:', apiDetails.Body);
+        console.log('Set Body from fallback logic:', apiDetails.Body);
       }
     }
 
-    logger.info('DEBUG: Final API Details:', JSON.stringify(apiDetails, null, 2));
-
+    console.log('DEBUG: Final API Details:', JSON.stringify(apiDetails, null, 2));
+    
+    // Add a sample body if none was found for testing
     if (!apiDetails.Body) {
       apiDetails.Body = '{"message": "Sample request body", "timestamp": "2025-01-01T00:00:00Z"}';
-      logger.info('DEBUG: Added sample body since none was found');
+      console.log('DEBUG: Added sample body since none was found');
     }
 
     const scenarioSheet = workbook.Sheets['Test_scenarios'];
     const scenarioData = XLSX.utils.sheet_to_json(scenarioSheet, { header: 1 });
-
+    
     const scenarios = scenarioData.slice(1).filter(row => row[0]).map(row => ({
       'Test Name': row[0],
       'Steps': row[1] || 'No steps provided',
@@ -359,10 +380,11 @@ const parseExcel = (filePath) => {
 
 const generateRestAssuredTest = async (apiDetails, scenarios, methodFileContent, testFileContent) => {
   try {
-    logger.info('Starting test script generation...');
-    logger.info('API Details:', JSON.stringify(apiDetails, null, 2));
-    logger.info('Scenarios count:', scenarios.length);
+    console.log('Starting test script generation...');
+    console.log('API Details:', JSON.stringify(apiDetails, null, 2));
+    console.log('Scenarios count:', scenarios.length);
 
+    // Use axios for Azure OpenAI API calls (more reliable than OpenAI SDK for Azure)
     const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
     const deploymentName = process.env.OPENAI_MODEL;
     const apiVersion = process.env.OPENAI_API_VERSION;
@@ -374,6 +396,10 @@ const generateRestAssuredTest = async (apiDetails, scenarios, methodFileContent,
 
     const url = `${azureEndpoint}/openai/deployments/${deploymentName}/chat/completions?api-version=${apiVersion}`;
 
+    // Enhanced prompt engineering based on Streamlit version
+    console.log('Generating comprehensive Rest Assured test script...');
+    
+    // Build context messages with improved prompt structure
     const contextMessages = [
       {
         role: 'system',
@@ -398,6 +424,7 @@ Generate REST Assured methods and tests separately. Include all scenarios in one
       }
     ];
 
+    // Add each scenario as a separate message for better context
     scenarios.forEach(scenario => {
       contextMessages.push({
         role: 'user',
@@ -405,6 +432,7 @@ Generate REST Assured methods and tests separately. Include all scenarios in one
       });
     });
 
+    // Add final instruction
     contextMessages.push({
       role: 'user',
       content: `Generate complete Rest Assured test script with methods and tests based on the provided API details and scenarios. Follow the exact patterns from the template files.
@@ -414,7 +442,7 @@ Generate REST Assured methods and tests separately. Include all scenarios in one
     const response = await axios.post(url, {
       messages: contextMessages,
       temperature: 0,
-      max_tokens: 4000,
+      max_tokens: 4000, // Increased for comprehensive output
       top_p: 1,
       frequency_penalty: 0,
       presence_penalty: 0
@@ -436,13 +464,16 @@ Generate REST Assured methods and tests separately. Include all scenarios in one
       throw new Error('Empty or invalid response from Azure OpenAI');
     }
 
-    const methodMarker = '=== METHOD FILE ===';
-    const testMarker = '=== TEST FILE ===';
-
+    // Parse the response to separate method and test files
     let generatedMethodFile = '';
     let generatedTestFile = '';
 
+    // Look for the structured format markers
+    const methodMarker = '=== METHOD FILE ===';
+    const testMarker = '=== TEST FILE ===';
+
     if (generatedContent.includes(methodMarker) && generatedContent.includes(testMarker)) {
+      // Parse structured response
       const methodStart = generatedContent.indexOf(methodMarker) + methodMarker.length;
       const testStart = generatedContent.indexOf(testMarker);
       const testContentStart = testStart + testMarker.length;
@@ -450,6 +481,7 @@ Generate REST Assured methods and tests separately. Include all scenarios in one
       generatedMethodFile = generatedContent.substring(methodStart, testStart).trim();
       generatedTestFile = generatedContent.substring(testContentStart).trim();
     } else {
+      // Fallback: try to split by common Java patterns
       const lines = generatedContent.split('\n');
       let currentSection = 'method';
       let methodLines = [];
@@ -459,7 +491,7 @@ Generate REST Assured methods and tests separately. Include all scenarios in one
         if (line.includes('@Test') || line.includes('public class') && line.includes('Test')) {
           currentSection = 'test';
         }
-
+        
         if (currentSection === 'method') {
           methodLines.push(line);
         } else {
@@ -470,62 +502,68 @@ Generate REST Assured methods and tests separately. Include all scenarios in one
       generatedMethodFile = methodLines.join('\n').trim();
       generatedTestFile = testLines.join('\n').trim();
 
+      // If we couldn't split properly, use the original approach
       if (!generatedMethodFile || !generatedTestFile) {
-        logger.warn('Could not parse structured response, using single file approach');
+        console.warn('Could not parse structured response, using single file approach');
         generatedMethodFile = generatedContent;
         generatedTestFile = generatedContent;
       }
     }
 
+    // Validate generated content
     if (!generatedMethodFile.trim() || !generatedTestFile.trim()) {
       throw new Error('Generated method or test file is empty');
     }
 
-    logger.info('Method and Test files generated successfully');
-    logger.info('Method file length:', generatedMethodFile.length);
-    logger.info('Test file length:', generatedTestFile.length);
+    console.log('Method and Test files generated successfully');
+    console.log('Method file length:', generatedMethodFile.length);
+    console.log('Test file length:', generatedTestFile.length);
 
     return {
       methodFile: generatedMethodFile,
       testFile: generatedTestFile
     };
   } catch (error) {
-    logger.error('Error in generateRestAssuredTest:', error.message);
+    console.error('Error in generateRestAssuredTest:', error.message);
     if (error.response) {
-      logger.error('API Response Status:', error.response.status);
-      logger.error('API Response Data:', JSON.stringify(error.response.data, null, 2));
+      console.error('API Response Status:', error.response.status);
+      console.error('API Response Data:', JSON.stringify(error.response.data, null, 2));
     }
     throw new Error(`Failed to generate test script: ${error.message}`);
   }
 };
 
+// Utility function to get timestamped filename (from Streamlit version)
 const getTimestampedFilename = (prefix = 'Generated', suffix = '.java') => {
   const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\./g, '-');
   return `${prefix}_${timestamp}${suffix}`;
 };
 
+// Enhanced utility function to save generated files with better organization
 const saveGeneratedFiles = async (methodFile, testFile, outputDir) => {
   try {
     const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\./g, '-');
     const methodFilename = `GeneratedMethods_${timestamp}.java`;
     const testFilename = `GeneratedTests_${timestamp}.java`;
     const combinedFilename = `GeneratedCombined_${timestamp}.java`;
-
+    
     const methodOutputPath = path.join(outputDir, methodFilename);
     const testOutputPath = path.join(outputDir, testFilename);
     const combinedOutputPath = path.join(outputDir, combinedFilename);
-
+    
+    // Save individual files
     await fs.writeFile(methodOutputPath, methodFile, 'utf8');
     await fs.writeFile(testOutputPath, testFile, 'utf8');
-
+    
+    // Save combined file for convenience
     const combinedContent = `// ======= METHOD FILE =======\n${methodFile}\n\n// ======= TEST FILE =======\n${testFile}`;
     await fs.writeFile(combinedOutputPath, combinedContent, 'utf8');
-
-    logger.info('Files saved successfully:');
-    logger.info('- Method file:', methodOutputPath);
-    logger.info('- Test file:', testOutputPath);
-    logger.info('- Combined file:', combinedOutputPath);
-
+    
+    console.log('Files saved successfully:');
+    console.log('- Method file:', methodOutputPath);
+    console.log('- Test file:', testOutputPath);
+    console.log('- Combined file:', combinedOutputPath);
+    
     return {
       methodFilename,
       testFilename,
@@ -535,21 +573,24 @@ const saveGeneratedFiles = async (methodFile, testFile, outputDir) => {
       combinedOutputPath
     };
   } catch (error) {
-    logger.error('Error saving files:', error.message);
+    console.error('Error saving files:', error.message);
     throw new Error(`Failed to save generated files: ${error.message}`);
   }
 };
 
+// Enhanced request validation middleware
 const validateGenerateScriptRequest = (req, res, next) => {
   const { dataSource, files, testrailConfig, useDefaultFiles } = req.body;
-
+  
+  // Validate data source
   if (!dataSource || !['excel', 'testrail'].includes(dataSource)) {
     return res.status(400).json({
       success: false,
       message: 'Invalid data source. Must be either "excel" or "testrail"'
     });
   }
-
+  
+  // Validate file requirements based on source
   if (!useDefaultFiles) {
     if (!files || !files.methodFile || !files.testFile) {
       return res.status(400).json({
@@ -557,7 +598,7 @@ const validateGenerateScriptRequest = (req, res, next) => {
         message: 'Method file and test file are required when not using default files'
       });
     }
-
+    
     if (dataSource === 'excel' && !files.excelFile) {
       return res.status(400).json({
         success: false,
@@ -565,7 +606,8 @@ const validateGenerateScriptRequest = (req, res, next) => {
       });
     }
   }
-
+  
+  // Validate TestRail configuration
   if (dataSource === 'testrail') {
     if (!testrailConfig || !testrailConfig.username || !testrailConfig.apikey || !testrailConfig.testCaseId) {
       return res.status(400).json({
@@ -574,7 +616,7 @@ const validateGenerateScriptRequest = (req, res, next) => {
       });
     }
   }
-
+  
   logger.info('Request validation passed', { dataSource, useDefaultFiles });
   next();
 };
@@ -602,8 +644,8 @@ app.post('/api/test-azure-openai', async (req, res) => {
     const apiVersion = process.env.OPENAI_API_VERSION;
 
     if (!endpoint || !apiKey || !deployment || !apiVersion) {
-      return res.status(500).json({
-        success: false,
+      return res.status(500).json({ 
+        success: false, 
         message: 'Azure OpenAI configuration is missing. Please check environment variables.',
         missingVars: {
           endpoint: !endpoint,
@@ -614,6 +656,7 @@ app.post('/api/test-azure-openai', async (req, res) => {
       });
     }
 
+    // Enhanced test with the same structure as the Streamlit version
     const testPrompt = {
       messages: [
         {
@@ -640,18 +683,18 @@ app.post('/api/test-azure-openai', async (req, res) => {
           'Content-Type': 'application/json',
           'api-key': apiKey
         },
-        timeout: 30000
+        timeout: 30000 // 30 seconds timeout
       }
     );
 
     const aiResponse = response.data.choices[0].message.content.trim();
-
-    res.json({
-      success: true,
+    
+    res.json({ 
+      success: true, 
       message: 'Azure OpenAI connection test successful!',
       response: aiResponse,
       config: {
-        endpoint: endpoint.replace(/https?:\/\//, '').split('.')[0] + '.***',
+        endpoint: endpoint.replace(/https?:\/\//, '').split('.')[0] + '.***', // Partially hide endpoint for security
         deployment: deployment,
         apiVersion: apiVersion,
         timestamp: new Date().toISOString()
@@ -659,18 +702,18 @@ app.post('/api/test-azure-openai', async (req, res) => {
       usage: response.data.usage || {}
     });
   } catch (error) {
-    logger.error('Azure OpenAI enhanced test error:', error.response?.data || error.message);
-
+    console.error('Azure OpenAI enhanced test error:', error.response?.data || error.message);
+    
     let errorMessage = 'Azure OpenAI connection test failed';
     let statusCode = 500;
-
+    
     if (error.response?.status === 401) {
       errorMessage = 'Azure OpenAI authentication failed - check API key';
       statusCode = 401;
     } else if (error.response?.status === 404) {
       errorMessage = 'Azure OpenAI deployment not found - check deployment name';
       statusCode = 404;
-    } else if (error.response?.status  === 429) {
+    } else if (error.response?.status === 429) {
       errorMessage = 'Azure OpenAI rate limit exceeded - try again later';
       statusCode = 429;
     } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
@@ -682,9 +725,9 @@ app.post('/api/test-azure-openai', async (req, res) => {
     } else if (error.response?.data?.error?.message) {
       errorMessage = `Azure OpenAI error: ${error.response.data.error.message}`;
     }
-
-    res.status(statusCode).json({
-      success: false,
+    
+    res.status(statusCode).json({ 
+      success: false, 
       message: errorMessage,
       details: error.response?.data || error.message,
       errorCode: error.code,
@@ -719,25 +762,30 @@ app.post('/api/preview-excel', upload.single('excelFile'), (req, res) => {
     let shouldCleanup = false;
 
     if (req.file) {
+      // New file uploaded
       filePath = req.file.path;
       fileName = req.file.originalname;
       shouldCleanup = true;
     } else if (req.body.filename) {
+      // Use existing uploaded file
       filePath = path.join(uploadsDir, req.body.filename);
       fileName = req.body.filename;
-
+      
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ success: false, message: 'Uploaded Excel file not found' });
       }
     } else if (req.body.useDefault) {
+      // Use default Excel file
       const defaultExcelPath = process.env.DEFAULT_EXCEL_PATH;
       if (!defaultExcelPath) {
         return res.status(500).json({ success: false, message: 'Default Excel path not configured' });
       }
-
+      
+      // Convert relative path to absolute path
+      // The file is in the backend directory
       filePath = path.resolve(__dirname, defaultExcelPath.replace(/^\//, ''));
       fileName = path.basename(filePath);
-
+      
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ success: false, message: 'Default Excel file not found at: ' + filePath });
       }
@@ -749,52 +797,57 @@ app.post('/api/preview-excel', upload.single('excelFile'), (req, res) => {
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-    logger.info('Available Excel columns:', Object.keys(jsonData[0] || {}));
-    logger.info('Sample row data:', jsonData[0]);
-
+    
+    // Get all available column headers for debugging
+    const availableHeaders = jsonData.length > 0 ? Object.keys(jsonData[0]) : [];
+    console.log('Available Excel columns:', availableHeaders);
+    console.log('Sample row data:', jsonData[0]);
+    
+    // Process test cases for preview with more flexible column mapping
     const testCases = jsonData.map((row, index) => {
       const testCase = {
-        testCaseName: row['Test Case'] || row['TestCase'] || row['test_case'] || row['Test_Case'] ||
-                      row['TestCaseName'] || row['Test Case Name'] || `Test Case ${index + 1}`,
-        method: row['Method'] || row['HTTP Method'] || row['method'] || row['REQUEST_METHOD'] ||
-                row['Http Method'] || row['Request Method'] || 'GET',
-        url: row['URL'] || row['Endpoint'] || row['url'] || row['endpoint'] ||
-             row['REQUEST_URL'] || row['Request URL'] || row['API_URL'] || 'N/A',
-        expectedStatusCode: row['Expected Status'] || row['Status Code'] || row['expected_status'] ||
+        testCaseName: row['Test Case'] || row['TestCase'] || row['test_case'] || row['Test_Case'] || 
+                     row['TestCaseName'] || row['Test Case Name'] || `Test Case ${index + 1}`,
+        method: row['Method'] || row['HTTP Method'] || row['method'] || row['REQUEST_METHOD'] || 
+               row['Http Method'] || row['Request Method'] || 'GET',
+        url: row['URL'] || row['Endpoint'] || row['url'] || row['endpoint'] || 
+            row['REQUEST_URL'] || row['Request URL'] || row['API_URL'] || 'N/A',
+        expectedStatusCode: row['Expected Status'] || row['Status Code'] || row['expected_status'] || 
                            row['Expected_Status'] || row['EXPECTED_STATUS'] || row['Response Code'] || '200',
-        description: row['Description'] || row['Test Description'] || row['description'] ||
+        description: row['Description'] || row['Test Description'] || row['description'] || 
                     row['TEST_DESCRIPTION'] || row['Test_Description'] || 'No description',
+        // Include all original fields for debugging
         originalData: row
       };
-
-      logger.info(`Test case ${index + 1}:`, testCase);
+      
+      console.log(`Test case ${index + 1}:`, testCase);
       return testCase;
     });
-
+    
+    // Clean up the temporary file if it was newly uploaded
     if (shouldCleanup && req.file) {
       fs.unlink(req.file.path, (err) => {
-        if (err) logger.error('Error deleting temporary file:', err);
+        if (err) console.error('Error deleting temporary file:', err);
       });
     }
-
+    
     res.json({
       success: true,
-      testCases: testCases.slice(0, 50),
+      testCases: testCases.slice(0, 50), // Limit to first 50 for preview
       summary: {
         totalRows: jsonData.length,
         sheets: workbook.SheetNames.length,
         fileName: fileName,
-        availableHeaders: Object.keys(jsonData[0] || {}),
+        availableHeaders: availableHeaders,
         sheetName: sheetName
       },
       debug: {
         sampleRow: jsonData[0] || {},
-        columnHeaders: Object.keys(jsonData[0] || {})
+        columnHeaders: availableHeaders
       }
     });
   } catch (error) {
-    logger.error('Excel preview error:', error);
+    console.error('Excel preview error:', error);
     res.status(500).json({ success: false, message: 'Failed to preview Excel file: ' + error.message });
   }
 });
@@ -802,23 +855,25 @@ app.post('/api/preview-excel', upload.single('excelFile'), (req, res) => {
 app.post('/api/preview-testrail', async (req, res) => {
   try {
     const { username, apikey, testCaseId, testrailBaseUrl } = req.body;
-
+    
     if (!username || !apikey || !testCaseId || !testrailBaseUrl) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required TestRail configuration'
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing required TestRail configuration' 
       });
     }
 
+    // Test connection first
     const connectionResult = await testTestrailConnection(username, apikey, testCaseId, testrailBaseUrl);
-
+    
     if (!connectionResult.success) {
       return res.status(400).json(connectionResult);
     }
 
+    // If connection successful, fetch test case details for preview
     const normalizedUrl = testrailBaseUrl.replace(/\/$/, '');
     const auth = Buffer.from(`${username}:${apikey}`).toString('base64');
-
+    
     const testCaseResponse = await axios.get(
       `${normalizedUrl}/index.php?/api/v2/get_case/${testCaseId}`,
       {
@@ -831,11 +886,12 @@ app.post('/api/preview-testrail', async (req, res) => {
     );
 
     const testCase = testCaseResponse.data;
-
+    
+    // Helper functions to get text values
     const getPriorityText = (priorityId) => {
       const priorities = {
         1: 'Low',
-        2: 'Medium',
+        2: 'Medium', 
         3: 'High',
         4: 'Critical'
       };
@@ -857,17 +913,20 @@ app.post('/api/preview-testrail', async (req, res) => {
       };
       return types[typeId] || `Type ${typeId}`;
     };
-
+    
+    // Helper function to parse and structure test steps
     const parseTestSteps = (steps) => {
       if (!steps) return [];
-
+      
       try {
         let parsedSteps = [];
-
+        
         if (typeof steps === 'string') {
           try {
+            // Try to parse as JSON first
             parsedSteps = JSON.parse(steps);
           } catch (e) {
+            // If not JSON, treat as plain text and split by lines
             const stepLines = steps.split(/\n|\r\n|\r/).filter(line => line.trim());
             parsedSteps = stepLines.map((step, index) => ({
               content: step.trim(),
@@ -879,7 +938,8 @@ app.post('/api/preview-testrail', async (req, res) => {
         } else {
           parsedSteps = [steps];
         }
-
+        
+        // Ensure each step has proper structure
         return parsedSteps.map((step, index) => ({
           stepNumber: index + 1,
           content: typeof step === 'string' ? step : step.content || step.step || 'No content',
@@ -887,15 +947,16 @@ app.post('/api/preview-testrail', async (req, res) => {
           type: detectStepType(typeof step === 'string' ? step : step.content || step.step || '')
         }));
       } catch (e) {
-        logger.error('Error parsing test steps:', e);
+        console.error('Error parsing test steps:', e);
         return [];
       }
     };
-
+    
+    // Helper function to detect step type
     const detectStepType = (stepText) => {
       const text = stepText.toLowerCase();
-      if (text.includes('api') || text.includes('request') || text.includes('post') ||
-          text.includes('get') || text.includes('put') || text.includes('delete') ||
+      if (text.includes('api') || text.includes('request') || text.includes('post') || 
+          text.includes('get') || text.includes('put') || text.includes('delete') || 
           text.includes('endpoint')) {
         return 'api';
       } else if (text.includes('verify') || text.includes('validate') || text.includes('check')) {
@@ -905,7 +966,7 @@ app.post('/api/preview-testrail', async (req, res) => {
       }
       return 'action';
     };
-
+    
     res.json({
       success: true,
       testCase: {
@@ -931,8 +992,8 @@ app.post('/api/preview-testrail', async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error('TestRail preview error:', error);
-
+    console.error('TestRail preview error:', error);
+    
     let errorMessage = 'Failed to preview TestRail data';
     if (error.response?.status === 401) {
       errorMessage = 'TestRail authentication failed - check credentials';
@@ -941,9 +1002,9 @@ app.post('/api/preview-testrail', async (req, res) => {
     } else if (error.code === 'ENOTFOUND') {
       errorMessage = 'Cannot reach TestRail server - check URL';
     }
-
-    res.status(500).json({
-      success: false,
+    
+    res.status(500).json({ 
+      success: false, 
       message: errorMessage,
       details: error.message
     });
@@ -953,105 +1014,130 @@ app.post('/api/preview-testrail', async (req, res) => {
 app.post('/api/generate-script', auth, validateGenerateScriptRequest, async (req, res) => {
   try {
     logger.info('Generate script request received');
-    const {
-      dataSource,
-      files,
+    const { 
+      dataSource, 
+      files, 
       testrailConfig,
-      useDefaultFiles
+      useDefaultFiles 
     } = req.body;
 
     logger.info('Request data processed', { dataSource, useDefaultFiles, filesCount: Object.keys(files || {}).length });
 
+    let apiDetails, scenarios;
+    let methodFileContent, testFileContent;
+
+    // Validate required environment variables
     const envValidation = validateEnvironmentConfig();
     if (!envValidation.valid) {
       throw new Error(`Missing Azure OpenAI configuration: ${envValidation.missingVars.join(', ')}`);
     }
 
-    let methodFileContent, testFileContent;
-
     if (useDefaultFiles) {
       if (!process.env.DEFAULT_METHOD_PATH || !process.env.DEFAULT_TEST_PATH) {
         throw new Error('Default file paths not configured in environment variables');
       }
-
-      logger.info('Reading default files');
-      const methodPath = path.resolve(__dirname, process.env.DEFAULT_METHOD_PATH);
-      const testPath = path.resolve(__dirname, process.env.DEFAULT_TEST_PATH);
-
-      if (!fs.existsSync(methodPath)) {
-        throw new Error(`Default method file not found: ${methodPath}`);
+      
+      if (dataSource === 'excel' && !process.env.DEFAULT_EXCEL_PATH) {
+        throw new Error('Default Excel path not configured in environment variables');
       }
-      if (!fs.existsSync(testPath)) {
-        throw new Error(`Default test file not found: ${testPath}`);
-      }
-
-      methodFileContent = fs.readFileSync(methodPath, 'utf8');
-      testFileContent = fs.readFileSync(testPath, 'utf8');
-    } else {
-      logger.info('Reading uploaded files');
-      if (!files.methodFile || !files.testFile) {
-        throw new Error('Method file and test file are required');
-      }
-
-      const methodPath = path.join(uploadsDir, files.methodFile);
-      const testPath = path.join(uploadsDir, files.testFile);
-
-      if (!fs.existsSync(methodPath)) {
-        throw new Error(`Uploaded method file not found: ${methodPath}`);
-      }
-      if (!fs.existsSync(testPath)) {
-        throw new Error(`Uploaded test file not found: ${testPath}`);
-      }
-
-      methodFileContent = fs.readFileSync(methodPath, 'utf8');
-      testFileContent =  fs.readFileSync(testPath, 'utf8');
     }
 
-    let apiDetails, scenarios;
-
-    if (dataSource === 'excel') {
-      logger.info('Parsing Excel data');
-      const excelPath = useDefaultFiles ?
-        path.resolve(__dirname, process.env.DEFAULT_EXCEL_PATH) :
-        path.join(uploadsDir, files.excelFile);
-
-      if (!fs.existsSync(excelPath)) {
-        throw new Error(`Excel file not found: ${excelPath}`);
+    // Read method and test files
+    try {
+      if (useDefaultFiles) {
+        logger.info('Reading default files');
+        const methodPath = path.resolve(__dirname, process.env.DEFAULT_METHOD_PATH);
+        const testPath = path.resolve(__dirname, process.env.DEFAULT_TEST_PATH);
+        
+        if (!fs.existsSync(methodPath)) {
+          throw new Error(`Default method file not found: ${methodPath}`);
+        }
+        if (!fs.existsSync(testPath)) {
+          throw new Error(`Default test file not found: ${testPath}`);
+        }
+        
+        methodFileContent = fs.readFileSync(methodPath, 'utf8');
+        testFileContent = fs.readFileSync(testPath, 'utf8');
+      } else {
+        logger.info('Reading uploaded files');
+        if (!files.methodFile || !files.testFile) {
+          throw new Error('Method file and test file are required');
+        }
+        
+        const methodPath = path.join(uploadsDir, files.methodFile);
+        const testPath = path.join(uploadsDir, files.testFile);
+        
+        if (!fs.existsSync(methodPath)) {
+          throw new Error(`Uploaded method file not found: ${methodPath}`);
+        }
+        if (!fs.existsSync(testPath)) {
+          throw new Error(`Uploaded test file not found: ${testPath}`);
+        }
+        
+        methodFileContent = fs.readFileSync(methodPath, 'utf8');
+        testFileContent = fs.readFileSync(testPath, 'utf8');
       }
-
-      const result = parseExcel(excelPath);
-      apiDetails = result.apiDetails;
-      scenarios = result.scenarios;
-    } else if (dataSource === 'testrail') {
-      logger.info('Fetching TestRail data');
-      let { username, apikey, testCaseId, testrailBaseUrl } = testrailConfig;
-
-      if (!username || !apikey || !testCaseId) {
-        throw new Error('TestRail configuration is incomplete');
-      }
-
-      if (!testrailBaseUrl) {
-        testrailBaseUrl = process.env.TESTRAIL_URL || 'https://morningstar.testrail.net';
-        logger.info('Using default TestRail URL', { testrailBaseUrl });
-      }
-
-      const testrailData = await fetchTestrailCases(testCaseId, username, apikey, testrailBaseUrl);
-      const parsedData = parseTestrailData(
-        testrailData.customPreconds,
-        testrailData.customStepsSeparated,
-        testrailData.apiDetails
-      );
-      apiDetails = parsedData.apiDetails;
-      scenarios = parsedData.scenarios;
-    } else {
-      throw new Error('Invalid data source specified');
+      
+      logger.info('Files read successfully', {
+        methodFileLength: methodFileContent.length,
+        testFileLength: testFileContent.length
+      });
+    } catch (fileError) {
+      logger.error('File reading error', fileError);
+      throw new Error(`Failed to read template files: ${fileError.message}`);
     }
 
-    logger.info('Data parsed successfully', {
-      apiDetails: Object.keys(apiDetails),
-      scenariosCount: scenarios.length
-    });
+    // Parse data based on source
+    try {
+      if (dataSource === 'excel') {
+        logger.info('Parsing Excel data');
+        const excelPath = useDefaultFiles ? 
+          path.resolve(__dirname, process.env.DEFAULT_EXCEL_PATH) : 
+          path.join(uploadsDir, files.excelFile);
+          
+        if (!fs.existsSync(excelPath)) {
+          throw new Error(`Excel file not found: ${excelPath}`);
+        }
+        
+        const result = parseExcel(excelPath);
+        apiDetails = result.apiDetails;
+        scenarios = result.scenarios;
+      } else if (dataSource === 'testrail') {
+        logger.info('Fetching TestRail data');
+        let { username, apikey, testCaseId, testrailBaseUrl } = testrailConfig;
+        
+        if (!username || !apikey || !testCaseId) {
+          throw new Error('TestRail configuration is incomplete');
+        }
+        
+        // Set default TestRail base URL if not provided
+        if (!testrailBaseUrl) {
+          testrailBaseUrl = process.env.TESTRAIL_URL || 'https://morningstar.testrail.net';
+          logger.info('Using default TestRail URL', { testrailBaseUrl });
+        }
+        
+        const testrailData = await fetchTestrailCases(testCaseId, username, apikey, testrailBaseUrl);
+        const parsedData = parseTestrailData(
+          testrailData.customPreconds, 
+          testrailData.customStepsSeparated, 
+          testrailData.apiDetails
+        );
+        apiDetails = parsedData.apiDetails;
+        scenarios = parsedData.scenarios;
+      } else {
+        throw new Error('Invalid data source specified');
+      }
+      
+      logger.info('Data parsed successfully', {
+        apiDetails: Object.keys(apiDetails),
+        scenariosCount: scenarios.length
+      });
+    } catch (parseError) {
+      logger.error('Data parsing error', parseError);
+      throw new Error(`Failed to parse data: ${parseError.message}`);
+    }
 
+    // Generate test script
     logger.info('Generating test script');
     const generatedFiles = await generateRestAssuredTest(apiDetails, scenarios, methodFileContent, testFileContent);
 
@@ -1059,6 +1145,7 @@ app.post('/api/generate-script', auth, validateGenerateScriptRequest, async (req
       throw new Error('Generated files are empty or invalid');
     }
 
+    // Save generated files using enhanced utility function
     const savedFiles = await saveGeneratedFiles(generatedFiles.methodFile, generatedFiles.testFile, outputDir);
 
     logger.info('Test script generation completed successfully', {
@@ -1085,8 +1172,8 @@ app.post('/api/generate-script', auth, validateGenerateScriptRequest, async (req
     });
   } catch (error) {
     logger.error('Generate script error', error);
-    res.status(500).json({
-      success: false,
+    res.status(500).json({ 
+      success: false, 
       message: error.message,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       timestamp: new Date().toISOString()
@@ -1098,7 +1185,7 @@ app.get('/api/download/:filename', (req, res) => {
   try {
     const filename = req.params.filename;
     const filePath = path.join(outputDir, filename);
-
+    
     if (fs.existsSync(filePath)) {
       res.download(filePath);
     } else {
@@ -1112,24 +1199,28 @@ app.get('/api/download/:filename', (req, res) => {
 app.get('/api/download-combined/:filename', (req, res) => {
   try {
     const filename = req.params.filename;
+    
+    // Support both timestamped and direct filenames
     let filePath;
     if (filename.includes('GeneratedCombined_')) {
       filePath = path.join(outputDir, filename);
     } else {
+      // If no specific combined file, look for the most recent one
       const files = fs.readdirSync(outputDir).filter(f => f.startsWith('GeneratedCombined_') && f.endsWith('.java'));
       if (files.length === 0) {
         return res.status(404).json({ success: false, message: 'No combined files found' });
       }
-
+      
+      // Sort by creation time (newest first)
       files.sort((a, b) => {
         const statA = fs.statSync(path.join(outputDir, a));
         const statB = fs.statSync(path.join(outputDir, b));
         return statB.mtime - statA.mtime;
       });
-
+      
       filePath = path.join(outputDir, files[0]);
     }
-
+    
     if (fs.existsSync(filePath)) {
       res.setHeader('Content-Type', 'text/plain');
       res.setHeader('Content-Disposition', `attachment; filename="${path.basename(filePath)}"`);
@@ -1138,7 +1229,7 @@ app.get('/api/download-combined/:filename', (req, res) => {
       res.status(404).json({ success: false, message: 'Combined file not found' });
     }
   } catch (error) {
-    logger.error('Download combined file error:', error.message);
+    console.error('Download combined file error:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -1155,12 +1246,12 @@ app.get('/api/list-generated-files', (req, res) => {
           size: stats.size,
           created: stats.birthtime,
           modified: stats.mtime,
-          type: file.includes('Methods') ? 'method' :
-                file.includes('Tests') ? 'test' :
+          type: file.includes('Methods') ? 'method' : 
+                file.includes('Tests') ? 'test' : 
                 file.includes('Combined') ? 'combined' : 'unknown'
         };
       })
-      .sort((a, b) => b.modified - a.modified);
+      .sort((a, b) => b.modified - a.modified); // Sort by modified date, newest first
 
     res.json({
       success: true,
@@ -1169,7 +1260,7 @@ app.get('/api/list-generated-files', (req, res) => {
       outputDirectory: outputDir
     });
   } catch (error) {
-    logger.error('List files error:', error.message);
+    console.error('List files error:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -1177,13 +1268,14 @@ app.get('/api/list-generated-files', (req, res) => {
 // Validate environment configuration on startup
 const envValidationResult = validateEnvironmentConfig();
 if (!envValidationResult.valid) {
-  logger.error('Invalid environment configuration. Missing variables:', envValidationResult.missingVars);
+  console.error('Invalid environment configuration. Missing variables:', envValidationResult.missingVars);
   process.exit(1);
 }
 
 app.listen(PORT, () => {
   logger.info(`Server is running on port ${PORT}`);
-
+  
+  // Validate environment configuration on startup
   const envValidation = validateEnvironmentConfig();
   if (!envValidation.valid) {
     logger.error('Server started with missing environment variables', { missingVars: envValidation.missingVars });
@@ -1191,18 +1283,20 @@ app.listen(PORT, () => {
   } else {
     logger.info('All required environment variables are configured');
   }
-
+  
+  // Check if default files exist
   if (process.env.DEFAULT_METHOD_PATH && process.env.DEFAULT_TEST_PATH) {
     const methodPath = path.resolve(__dirname, process.env.DEFAULT_METHOD_PATH);
     const testPath = path.resolve(__dirname, process.env.DEFAULT_TEST_PATH);
-
+    
     if (fs.existsSync(methodPath) && fs.existsSync(testPath)) {
       logger.info('Default template files found and accessible');
     } else {
       logger.warn('Default template files not found - users will need to upload files manually');
     }
   }
-
+  
+  // Check output directory
   if (fs.existsSync(outputDir)) {
     logger.info('Output directory is ready', { outputDir });
   } else {
